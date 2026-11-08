@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>拍子合わせ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: 一周=一小節の円盤を主役に、右に操作盤。狭い画面では縦積み。 */
+:root {
+  --ai: #12264a; --ai-2: #1b3563; --line: #3a5488;
+  --kinari: #f1ead8; --yamabuki: #f2b632; --moegi: #9fd38a; --sabi: #ff8a70; --mute: #aab6cd;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body { background: var(--ai); color: var(--kinari); font-family: var(--body); font-size: 16px; line-height: 1.6; }
+.wrap {
+  max-width: 940px; margin: 0 auto; padding-block: 24px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 16px 40px; align-items: center;
+}
+header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: 1.75rem; margin: 0; line-height: 1.3; }
+header p { margin: 0; color: var(--mute); font-size: .9rem; }
+
+.dial { position: relative; width: 100%; max-width: 460px; aspect-ratio: 1; margin: 0 auto; }
+canvas { width: 100%; height: 100%; display: block; }
+.center { position: absolute; inset: 34%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+#judge { font-family: var(--display); font-size: clamp(1.1rem, 4.6vw, 1.6rem); line-height: 1.25; min-height: 1.25em; }
+#phase { font-size: .85rem; color: var(--mute); font-variant-numeric: tabular-nums; }
+
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.order { font-size: 1.05rem; margin: 0; }
+.order b { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.order .me b { color: var(--kinari); } .order .you b { color: var(--yamabuki); }
+.order span { display: block; }
+
+#pad {
+  font: inherit; font-weight: 700; color: var(--ai); background: var(--yamabuki); border: 0; border-radius: 10px;
+  padding: 18px 12px; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  box-shadow: 0 5px 0 #a87a14; transition: transform 40ms, box-shadow 40ms;
+}
+#pad.down { transform: translateY(4px); box-shadow: 0 1px 0 #a87a14; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font: inherit; font-weight: 700; color: var(--kinari); background: var(--ai-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; cursor: pointer; }
+.btn.main { background: var(--kinari); color: var(--ai); border-color: var(--kinari); }
+.btn:hover { border-color: var(--yamabuki); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--yamabuki); outline-offset: 2px; }
+
+#result { background: var(--ai-2); border-radius: 10px; padding: 12px 16px; }
+#rank { font-family: var(--display); font-size: 1.35rem; margin: 0; }
+#rank.ok { color: var(--moegi); } #rank.ng { color: var(--sabi); }
+#detail { margin: 4px 0 0; font-size: .875rem; color: var(--mute); font-variant-numeric: tabular-nums; }
+
+h2 { font-size: .85rem; color: var(--mute); margin: 0 0 6px; font-weight: 700; }
+.stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.chip { font: inherit; font-size: .9rem; font-variant-numeric: tabular-nums; color: var(--kinari); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 4px 2px; cursor: pointer; line-height: 1.3; }
+.chip small { display: block; font-size: .7rem; color: var(--mute); }
+.chip.on { background: var(--kinari); color: var(--ai); border-color: var(--kinari); }
+.chip.on small { color: var(--ai); }
+.chip.clear small { color: var(--moegi); } .chip.clear.on small { color: #2d6a1f; }
+.settings { display: grid; gap: 8px; font-size: .875rem; }
+.settings label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.settings input { flex: 1; min-width: 120px; accent-color: var(--yamabuki); }
+.settings output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+.settings .check input { flex: none; min-width: 0; }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.tab { font: inherit; font-weight: 700; color: var(--mute); background: none; border: 0; border-bottom: 3px solid transparent; padding: 6px 4px; cursor: pointer; }
+.tab.on { color: var(--kinari); border-bottom-color: var(--yamabuki); }
+.meta { margin: 6px 0 0; font-size: .875rem; color: var(--mute); font-variant-numeric: tabular-nums; }
+.diffs { display: grid; gap: 6px; }
+.diff { font: inherit; color: var(--kinari); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; align-items: center; line-height: 1.4; }
+.diff b { font-size: .95rem; }
+.diff small { grid-column: 1; font-size: .75rem; color: var(--mute); }
+.diff i { grid-column: 2; grid-row: 1 / 3; font-style: normal; font-size: .75rem; color: var(--moegi); font-variant-numeric: tabular-nums; }
+.diff.on { background: var(--kinari); color: var(--ai); border-color: var(--kinari); }
+.diff.on small { color: var(--ai); } .diff.on i { color: #2d6a1f; }
+.custom { display: grid; gap: 8px; font-size: .875rem; }
+.nums { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.custom label { display: flex; align-items: center; gap: 8px; }
+.custom input[type=range] { flex: 1; min-width: 100px; accent-color: var(--yamabuki); }
+.custom output { font-variant-numeric: tabular-nums; min-width: 3.5em; text-align: right; }
+.custom select { font: inherit; padding: 4px 6px; color: var(--kinari); background: var(--ai-2); border: 1px solid var(--line); border-radius: 6px; }
+.custom input[type=number] { font: inherit; width: 4.5em; padding: 4px 6px; color: var(--kinari); background: var(--ai-2); border: 1px solid var(--line); border-radius: 6px; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .wrap { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>拍子合わせ</h1>
+    <p>一周のあいだに、私とあなたで違う数の拍を打ちます。</p>
+  </header>
+
+  <div class="dial">
+    <canvas id="cv" aria-label="一周を一小節として拍の位置を示す円盤"></canvas>
+    <div class="center"><div id="judge" aria-live="polite"></div><div id="phase"></div></div>
+  </div>
+
+  <div class="panel">
+    <p class="order">
+      <span class="me">私は ○ <b id="oN">3</b> 拍子をたたきます。</span>
+      <span class="you">あなたは ● <b id="oM">4</b> 拍子をスペースキーで。</span>
+      <span class="meta" id="meta"></span>
+    </p>
+
+    <button id="pad" type="button" tabindex="-1">スペースキー ／ ここをタップ</button>
+
+    <div id="result" hidden><p id="rank"></p><p id="detail"></p></div>
+
+    <div class="row">
+      <button id="go" class="btn main" type="button">はじめる（スペース）</button>
+      <button id="retry" class="btn" type="button" hidden>もう一度</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab" type="button" id="tab-random" data-mode="random">ランダム</button>
+      <button class="tab" type="button" id="tab-stage" data-mode="stage">ステージ</button>
+      <button class="tab" type="button" id="tab-custom" data-mode="custom">カスタム</button>
+    </div>
+
+    <div id="pRandom" hidden>
+      <div class="diffs" id="diffs"></div>
+    </div>
+
+    <div id="pStage" hidden>
+      <h2>○ 対 ● を選ぶ</h2>
+      <div class="stages" id="stages"></div>
+    </div>
+
+    <div id="pCustom" class="custom" hidden>
+      <div class="nums">
+        <label for="cN">○ の数 <input id="cN" type="number" min="1" value="3"></label>
+        <label for="cM">● の数 <input id="cM" type="number" min="1" value="4"></label>
+      </div>
+      <label for="cRand"><input id="cRand" type="checkbox"> 数を毎回ランダムにする（2〜9）</label>
+      <label for="cPreset">難易度の設定
+        <select id="cPreset">
+          <option value="">読み込む…</option>
+          <option value="0">イージー</option>
+          <option value="1">ノーマル</option>
+          <option value="2">ハード</option>
+          <option value="3">エキスパート</option>
+          <option value="4">マスター</option>
+        </select></label>
+      <div class="nums">
+        <label for="cDemo">お手本 <input id="cDemo" type="number" min="0" value="2"> 周</label>
+        <label for="cPlay">本番 <input id="cPlay" type="number" min="1" value="4"> 周</label>
+        <label for="cClear">合格 <input id="cClear" type="number" min="0" max="100" value="70"> 点</label>
+      </div>
+      <label for="cJudge">判定の幅
+        <input id="cJudge" type="range" min="40" max="200" step="5" value="100">
+        <output id="cJudgeV"></output></label>
+      <label for="cHide"><input id="cHide" type="checkbox"> 本番は ● の印を消す</label>
+    </div>
+
+    <div class="settings">
+      <label for="rndTempo" class="check" id="rowRnd"><input id="rndTempo" type="checkbox"> テンポを毎回ランダムにする</label>
+      <label for="speed" id="rowSpeed">一周の長さ
+        <input id="speed" type="range" min="1.6" max="4" step="0.2" value="2.8">
+        <output id="speedV"></output></label>
+      <label for="offset">音ズレ補正
+        <input id="offset" type="range" min="-150" max="150" step="5" value="0">
+        <output id="offsetV"></output></label>
+    </div>
+  </div>
+</div>
+
+<script>
+const STAGES = [[2,3],[3,2],[3,4],[4,3],[2,5],[5,2],[3,5],[5,3],[4,5],[5,4],[5,6],[7,4]];
+const CLEAR = 70;
+/* マスターの段階：Lv.1 は最大9拍、1段階ごとに最大の数を2増やす（上限32）。大きい方の数が上限付近の組だけを出す */
+const MASTER_TOP = 12;
+const masterMax = lv => Math.min(32, 9 + lv * 2);
+function masterPairs(max) {
+  const gcd = (a, b) => b ? gcd(b, a % b) : a, out = [];
+  for (let b = Math.max(6, max - 3); b <= max; b++)
+    for (let a = Math.max(5, Math.ceil(b / 2)); a < b; a++)
+      if (gcd(a, b) === 1) out.push([a, b], [b, a]);
+  return out;
+}
+/* 難易度：数の組（細かくズレるほど難しい）、一周の長さ、最速の拍の間隔の下限、お手本の周回、判定の幅、合格点で決める */
+const DIFFS = [
+  { id: 'easy', name: 'イージー', desc: '2〜4拍・ゆっくり・お手本3周・判定ゆるめ・合格60点',
+    pairs: [[2,3],[3,2],[3,4],[4,3]], L: [3, 4], minGap: .7, demo: 3, play: 3, j: 1.3, clear: 60 },
+  { id: 'normal', name: 'ノーマル', desc: '2〜5拍・ふつうの速さ・合格70点',
+    pairs: [[3,4],[4,3],[2,5],[5,2],[3,5],[5,3]], L: [2.4, 3.4], minGap: .5, demo: 2, play: 4, j: 1, clear: 70 },
+  { id: 'hard', name: 'ハード', desc: '2〜7拍・速め・合格70点',
+    pairs: [[3,5],[5,3],[4,5],[5,4],[2,7],[7,2],[3,7],[7,3]], L: [2, 3], minGap: .36, demo: 2, play: 4, j: 1, clear: 70 },
+  { id: 'expert', name: 'エキスパート', desc: '3〜8拍・お手本1周・判定きびしめ・合格75点',
+    pairs: [[5,6],[6,5],[4,7],[7,4],[3,8],[8,3],[5,7],[7,5]], L: [1.8, 2.6], minGap: .3, demo: 1, play: 4, j: .85, clear: 75 },
+  { id: 'master', name: 'マスター', desc: '最大9拍から。合格で数が増え最大32拍、不合格で1段階戻る。Lv.5から●の印が消える',
+    pairs: masterPairs(9), L: [2, 2.8], minGap: .3, demo: 2, play: 4, j: .8, clear: 75 }
+];
+const MODES = { random: 'pRandom', stage: 'pStage', custom: 'pCustom' };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const rnd = (a, b) => Math.round((a + Math.random() * (b - a)) * 10) / 10;
+const fitL = (L, n, m, gap) => Math.max(L, Math.ceil(Math.max(n, m) * gap * 10) / 10);
+const $ = id => document.getElementById(id);
+const css = getComputedStyle(document.documentElement);
+const C = n => css.getPropertyValue('--' + n).trim();
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+const S = {
+  state: 'idle', idx: store.get('hs.idx', 2), next: null,
+  best: store.get('hs.best', {}), R: null,
+  mode: store.get('hs.mode', 'random'), diff: store.get('hs.diff', 1),
+  streaks: store.get('hs.streaks', {}), streak: 0, mLv: Math.min(MASTER_TOP, Math.max(0, +store.get('hs.mLv', 0) || 0)), retry: false, cfg: null, last: ''
+};
+if (!MODES[S.mode]) S.mode = 'random';
+if (!DIFFS[S.diff]) S.diff = 1;
+$('cN').value = store.get('hs.cN', 3);
+$('cM').value = store.get('hs.cM', 4);
+$('cDemo').value = store.get('hs.cDemo', 2);
+$('cPlay').value = store.get('hs.cPlay', 4);
+$('cClear').value = store.get('hs.cClear', 70);
+$('cJudge').value = store.get('hs.cJudge', 100);
+$('cHide').checked = store.get('hs.cHide', false);
+$('cRand').checked = store.get('hs.cRand', false);
+$('rndTempo').checked = store.get('hs.rndTempo', false);
+if (!STAGES[S.idx]) S.idx = 2;
+$('speed').value = store.get('hs.speed', 2.8);
+$('offset').value = store.get('hs.offset', 0);
+
+/* ---- 音 ---- */
+let ctx, noise;
+function audio() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    noise = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+function env(t, peak, dur, dest) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(peak, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  g.connect(dest);
+  return g;
+}
+/* ○ 拍子木のような乾いた音 */
+function clack(t, accent, dest) {
+  const o = ctx.createOscillator(); o.type = 'triangle';
+  o.frequency.value = accent ? 1500 : 1180;
+  o.connect(env(t, accent ? .55 : .38, .07, dest)); o.start(t); o.stop(t + .08);
+  const n = ctx.createBufferSource(); n.buffer = noise;
+  const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2400; f.Q.value = 1.5;
+  n.connect(f); f.connect(env(t, .4, .03, dest)); n.start(t); n.stop(t + .04);
+}
+/* ● 太鼓のような低い音 */
+function drum(t, vol, dest) {
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(190, t);
+  o.frequency.exponentialRampToValueAtTime(85, t + .12);
+  o.connect(env(t, vol, .2, dest)); o.start(t); o.stop(t + .22);
+}
+
+/* ---- 進行 ---- */
+function latency() { return (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0; }
+function offset() { return +$('offset').value / 1000; }
+
+function tempo(n, m) {
+  if (!$('rndTempo').checked) return +$('speed').value;
+  return fitL(rnd(1.6, 4), n, m, .2);
+}
+function clampNum(id, min, max = Infinity) {
+  const r = Math.round(+$(id).value);
+  const v = Math.min(max, Math.max(min, Number.isFinite(r) ? r : min));
+  $(id).value = v; store.set('hs.' + id, v);
+  return v;
+}
+function roll() {
+  const base = { demo: 2, play: 4, j: 1, clear: CLEAR, hide: false };
+  if (S.mode === 'random') {
+    let d = DIFFS[S.diff];
+    if (d.id === 'master') {
+      const lv = S.mLv;
+      d = { ...d, pairs: masterPairs(masterMax(lv)), minGap: Math.max(.24, .3 - lv * .005),
+            hide: lv >= 4, clear: lv >= 4 ? 80 : 75, tag: `${d.name} Lv.${lv + 1}` };
+    }
+    let p;
+    do { p = pick(d.pairs); } while (p.join() === S.last && d.pairs.length > 1);
+    S.last = p.join();
+    const [n, m] = p;
+    return { ...base, ...d, n, m, L: fitL(rnd(d.L[0], d.L[1]), n, m, d.minGap), tag: d.tag || d.name };
+  }
+  if (S.mode === 'custom') {
+    const r = () => 2 + Math.floor(Math.random() * 8);
+    let n = clampNum('cN', 1), m = clampNum('cM', 1);
+    if ($('cRand').checked) { n = r(); do { m = r(); } while (m === n); }
+    return { ...base, n, m, L: tempo(n, m), tag: 'カスタム',
+      demo: clampNum('cDemo', 0), play: clampNum('cPlay', 1), clear: clampNum('cClear', 0, 100),
+      j: +$('cJudge').value / 100, hide: $('cHide').checked };
+  }
+  const [n, m] = STAGES[S.idx];
+  return { ...base, n, m, L: tempo(n, m), tag: 'ステージ' };
+}
+function setup() {
+  const c = S.cfg = roll();
+  $('rowSpeed').hidden = S.mode === 'random' || $('rndTempo').checked;
+  $('oN').textContent = c.n; $('oM').textContent = c.m;
+  $('meta').textContent = `${c.tag}／一周 ${c.L.toFixed(1)} 秒／お手本 ${c.demo} 周＋本番 ${c.play} 周／判定 ${Math.round(c.j * 100)}%／合格 ${c.clear} 点${c.hide ? '／本番は●の印なし' : ''}`;
+  draw();
+}
+function reset() {
+  if (S.state === 'run') stopSound();
+  S.state = 'idle'; S.R = null; S.next = null;
+  $('result').hidden = true; $('retry').hidden = true;
+  $('go').textContent = 'はじめる（スペース）';
+  say(''); $('phase').textContent = '';
+}
+
+function start() {
+  audio();
+  document.activeElement && document.activeElement.blur();
+  stopSound();
+  const { n, m, L, demo, play, j, clear, hide } = S.cfg;
+  const t0 = ctx.currentTime + .7;
+  const bus = ctx.createGain(); bus.connect(ctx.destination);
+  const end = t0 + (demo + play) * L;
+
+  /* 拍数が多くても固まらないよう、音は鳴る直前に少しずつ予約する */
+  const targets = [], q = [];
+  for (let k = 0; k < demo + play; k++) {
+    for (let i = 0; i < n; i++) q.push({ t: t0 + (k + i / n) * L, a: i === 0 });
+    for (let i = 0; i < m; i++) {
+      const t = t0 + (k + i / m) * L;
+      if (k < demo) q.push({ t, d: true }); else targets.push({ t, done: false });
+    }
+  }
+  q.push({ t: end, a: true });
+  q.sort((x, y) => x.t - y.t);
+  targets.push({ t: end, done: false });
+
+  S.R = { n, m, L, t0, end, bus, targets, taps: [], W: Math.min(.15 * j, L / m * .45), sum: 0, extra: 0,
+          demo, play, j, clear, hide, q, qi: 0, c: { perfect: 0, good: 0, off: 0, miss: 0 }, delta: [] };
+  pump(S.R);
+  S.state = 'run'; S.next = null;
+  $('result').hidden = true; $('retry').hidden = true;
+  $('go').textContent = 'やめる';
+  say('');
+  requestAnimationFrame(frame);
+}
+function pump(R) {
+  const lim = ctx.currentTime + .3;
+  while (R.qi < R.q.length && R.q[R.qi].t <= lim) {
+    const e = R.q[R.qi++];
+    if (e.d) drum(e.t, .7, R.bus); else clack(e.t, e.a, R.bus);
+  }
+}
+function stopSound() { if (S.R && S.R.bus) { S.R.bus.disconnect(); S.R.bus = null; } }
+function abort() {
+  stopSound(); S.state = 'idle'; S.R = null;
+  $('go').textContent = 'はじめる（スペース）';
+  say(''); $('phase').textContent = ''; draw();
+}
+function say(txt, col) { const j = $('judge'); j.textContent = txt; j.style.color = col || ''; }
+
+function tap() {
+  const pad = $('pad'); pad.classList.add('down'); setTimeout(() => pad.classList.remove('down'), 80);
+  if (S.state !== 'run') return;
+  const R = S.R, now = ctx.currentTime;
+  drum(now, .8, ctx.destination);
+  const heard = now - latency() - offset();
+  if (heard < R.t0 + R.demo * R.L - R.W) return;   // お手本中は判定しない
+
+  let best = null, bd = 1e9;
+  for (const x of R.targets) if (!x.done) {
+    const d = Math.abs(heard - x.t);
+    if (d < bd) { bd = d; best = x; }
+  }
+  if (!best || bd > R.W) {
+    R.extra++; R.taps.push({ t: heard, col: C('sabi') }); say('よけい', C('sabi')); return;
+  }
+  best.done = true;
+  const d = heard - best.t, a = Math.abs(d);
+  R.delta.push(d);
+  let col, txt;
+  if (a <= .035 * R.j) { R.sum += 100; R.c.perfect++; col = C('yamabuki'); txt = 'ぴったり'; }
+  else if (a <= .08 * R.j) { R.sum += 70; R.c.good++; col = C('moegi'); txt = d < 0 ? '少し早い' : '少し遅い'; }
+  else { R.sum += 30; R.c.off++; col = C('sabi'); txt = d < 0 ? '早い' : '遅い'; }
+  R.taps.push({ t: heard, col }); say(txt, col);
+}
+
+function update() {
+  const R = S.R, now = ctx.currentTime - latency() - offset();
+  pump(R);
+  for (const x of R.targets) if (!x.done && now > x.t + R.W) {
+    x.done = true; R.c.miss++; say('のがした', C('sabi'));
+  }
+  const k = Math.floor((now - R.t0) / R.L);
+  $('phase').textContent = k < 0 ? 'よーい' : k < R.demo ? `お手本 ${k + 1}/${R.demo}` : k < R.demo + R.play ? `本番 ${k - R.demo + 1}/${R.play}` : '';
+  if (now > R.end + R.W + .25) finish();
+}
+
+function score(R) {
+  return Math.max(0, Math.min(100, Math.round((R.sum - 15 * R.extra) / R.targets.length)));
+}
+function finish() {
+  const R = S.R, p = score(R);
+  S.state = 'done';
+  const key = R.n + ':' + R.m;
+  const cleared = p >= R.clear;
+  if (S.mode === 'stage' && p > (S.best[key] || 0)) { S.best[key] = p; store.set('hs.best', S.best); }
+  if (S.mode === 'random') {
+    const id = DIFFS[S.diff].id;
+    if (!cleared) S.streak = 0;
+    else if (!S.retry) {
+      S.streak++;
+      if (S.streak > (S.streaks[id] || 0)) { S.streaks[id] = S.streak; store.set('hs.streaks', S.streaks); }
+    }
+  }
+  const isMaster = S.mode === 'random' && DIFFS[S.diff].id === 'master';
+  if (isMaster && !S.retry) {
+    S.mLv = Math.min(MASTER_TOP, Math.max(0, S.mLv + (cleared ? 1 : -1)));
+    store.set('hs.mLv', S.mLv);
+  }
+  renderStages(); renderDiffs();
+  say(p + '点', cleared ? C('yamabuki') : C('sabi'));
+  $('phase').textContent = '';
+  const rank = p >= 95 ? '免許皆伝' : p >= 85 ? 'お見事' : cleared ? '合格' : 'もう一息';
+  $('rank').textContent = rank + (S.mode === 'random' && S.streak ? `　${S.streak} 連続` : '') + (isMaster ? `　次は Lv.${S.mLv + 1}` : '');
+  $('rank').className = cleared ? 'ok' : 'ng';
+  const c = R.c;
+  let lean = '';
+  if (R.delta.length) {
+    const m = Math.round(R.delta.reduce((a, b) => a + b, 0) / R.delta.length * 1000);
+    lean = Math.abs(m) < 5 ? '　平均ズレ ほぼ0' : `　平均 ${Math.abs(m)}ms ${m < 0 ? '早め' : '遅め'}`;
+  }
+  $('detail').textContent = `ぴったり ${c.perfect}／少しズレ ${c.good}／ズレ ${c.off}／のがし ${c.miss}／よけい ${R.extra}${lean}`;
+  $('result').hidden = false;
+  if (S.mode === 'random') {
+    $('go').textContent = '次のランダムへ（スペース）';
+    $('retry').textContent = '同じ問題をもう一度';
+    $('retry').hidden = false;
+  } else if (S.mode === 'stage' && cleared && S.idx < STAGES.length - 1) {
+    S.next = S.idx + 1;
+    const [a, b] = STAGES[S.next];
+    $('go').textContent = `次の ${a} 対 ${b} へ（スペース）`;
+    $('retry').textContent = 'もう一度';
+    $('retry').hidden = false;
+  } else {
+    $('go').textContent = 'もう一度（スペース）';
+  }
+  draw();
+}
+
+/* ---- 描画 ---- */
+const cv = $('cv'), g = cv.getContext('2d');
+function fit() {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cv.width = r.width * d; cv.height = r.height * d;
+  g.setTransform(d, 0, 0, d, 0, 0);
+  draw();
+}
+function frame() {
+  if (S.state !== 'run') return;
+  update();
+  if (S.state === 'run') { draw(); requestAnimationFrame(frame); }
+}
+function pt(a, r, c) { const th = a * 2 * Math.PI - Math.PI / 2; return [c + r * Math.cos(th), c + r * Math.sin(th)]; }
+function draw() {
+  const size = cv.getBoundingClientRect().width, c = size / 2;
+  if (!size) return;
+  g.clearRect(0, 0, size, size);
+  if (!S.cfg) return;
+  const { n, m } = S.R || S.cfg;
+  const R = S.R, outer = size * .43, inner = size * .32, dots = size * .245;
+
+  let frac = 0, now = 0, running = S.state === 'run' && R;
+  if (running) {
+    now = ctx.currentTime - latency();
+    const p = (now - R.t0) / R.L;
+    frac = p < 0 || now > R.end ? 0 : p % 1;
+  }
+  g.lineWidth = 1.5; g.strokeStyle = C('line');
+  for (const r of [outer, inner]) { g.beginPath(); g.arc(c, c, r, 0, 7); g.stroke(); }
+
+  /* 拍が鳴った直後だけ印を膨らませる */
+  const pop = (i, N) => {
+    if (!running || now < R.t0) return 0;
+    const age = ((frac - i / N + 1) % 1) * R.L;
+    return age < .16 ? 1 - age / .16 : 0;
+  };
+  /* 数が多いときは印が重ならないよう小さくする */
+  const baseO = Math.min(size * .03, Math.PI * outer / n * .6);
+  const baseI = Math.min(size * .03, Math.PI * inner / m * .6);
+  for (let i = 0; i < n; i++) {
+    const [x, y] = pt(i / n, outer, c), s = baseO * (1 + .55 * pop(i, n));
+    g.beginPath(); g.arc(x, y, s, 0, 7);
+    g.fillStyle = C('ai'); g.fill();
+    g.lineWidth = Math.min(size * .011, baseO * .4); g.strokeStyle = C('kinari'); g.stroke();
+  }
+  const hideM = running && R.hide && now >= R.t0 + R.demo * R.L;
+  for (let i = 0; i < (hideM ? 0 : m); i++) {
+    const [x, y] = pt(i / m, inner, c), s = baseI * (1 + .55 * pop(i, m));
+    g.beginPath(); g.arc(x, y, s, 0, 7);
+    g.fillStyle = C('yamabuki'); g.fill();
+  }
+  if (R && S.state !== 'idle') {
+    const adj = R.t0;
+    for (const t of R.taps) {
+      const age = S.state === 'run' ? (now - t.t) / (R.L * 1.5) : 0;
+      if (age >= 1) continue;
+      const [x, y] = pt(((t.t - adj) / R.L % 1 + 1) % 1, dots, c);
+      g.globalAlpha = 1 - age; g.beginPath(); g.arc(x, y, size * .013, 0, 7);
+      g.fillStyle = t.col; g.fill(); g.globalAlpha = 1;
+    }
+  }
+  const [a, b] = pt(frac, inner * .62, c), [e, f] = pt(frac, outer + size * .045, c);
+  g.strokeStyle = C('kinari'); g.lineWidth = 2; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(a, b); g.lineTo(e, f); g.stroke();
+}
+
+/* ---- 画面 ---- */
+function select(i) {
+  S.idx = i; store.set('hs.idx', i);
+  renderStages(); setup();
+}
+function renderDiffs() {
+  const box = $('diffs'); box.textContent = '';
+  DIFFS.forEach((d, i) => {
+    const b = document.createElement('button');
+    const best = S.streaks[d.id];
+    b.type = 'button'; b.id = 'diff-' + d.id;
+    b.className = 'diff' + (i === S.diff ? ' on' : '');
+    b.innerHTML = `<b>${d.name}</b><i>${best ? '最高 ' + best + ' 連続' : ''}</i><small>${d.desc}</small>`;
+    b.onclick = () => {
+      reset(); S.diff = i; S.streak = 0; store.set('hs.diff', i);
+      renderDiffs(); setup();
+    };
+    box.appendChild(b);
+  });
+}
+function setMode(mode) {
+  S.mode = mode; store.set('hs.mode', mode); S.streak = 0;
+  for (const k in MODES) {
+    $(MODES[k]).hidden = k !== mode;
+    $('tab-' + k).classList.toggle('on', k === mode);
+  }
+  $('rowRnd').hidden = $('rowSpeed').hidden = mode === 'random';
+  setup();
+}
+function renderStages() {
+  const box = $('stages'); box.textContent = '';
+  STAGES.forEach(([n, m], i) => {
+    const b = document.createElement('button');
+    const best = S.best[n + ':' + m];
+    b.type = 'button'; b.id = 'st' + i;
+    b.className = 'chip' + (i === S.idx ? ' on' : '') + (best >= CLEAR ? ' clear' : '');
+    b.innerHTML = `${n} 対 ${m}<small>${best ? best + '点' : '未挑戦'}</small>`;
+    b.onclick = () => { reset(); select(i); };
+    box.appendChild(b);
+  });
+}
+function primary() {
+  if (S.state === 'run') { abort(); return; }
+  S.retry = false;
+  if (S.state === 'done') {
+    if (S.next !== null) { S.idx = S.next; store.set('hs.idx', S.idx); S.next = null; renderStages(); }
+    setup();
+  }
+  start();
+}
+$('go').onclick = primary;
+$('retry').onclick = () => { S.retry = true; start(); };
+for (const k in MODES) $('tab-' + k).onclick = () => { reset(); setMode(k); $('tab-' + k).blur(); };
+/* 問題が変わったらボタンのフォーカスを外し、そのままスペースで始められるようにする */
+$('diffs').addEventListener('click', () => document.activeElement.blur());
+$('stages').addEventListener('click', () => document.activeElement.blur());
+const onSetting = () => { if (S.state !== 'run') { reset(); setup(); } };
+for (const id of ['cN', 'cM', 'cDemo', 'cPlay', 'cClear']) $(id).addEventListener('change', () => { onSetting(); $(id).blur(); });
+for (const id of ['cRand', 'rndTempo', 'cHide']) $(id).addEventListener('change', () => {
+  store.set('hs.' + id, $(id).checked); onSetting(); $(id).blur();
+});
+$('cJudge').addEventListener('input', () => { store.set('hs.cJudge', +$('cJudge').value); showSettings(); });
+$('cJudge').addEventListener('change', () => { onSetting(); $('cJudge').blur(); });
+$('cPreset').addEventListener('change', () => {
+  const d = DIFFS[$('cPreset').value];
+  $('cPreset').value = ''; $('cPreset').blur();
+  if (!d) return;
+  $('cDemo').value = d.demo; $('cPlay').value = d.play; $('cClear').value = d.clear;
+  $('cJudge').value = Math.round(d.j * 100); $('cHide').checked = !!d.hide;
+  store.set('hs.cJudge', +$('cJudge').value); store.set('hs.cHide', !!d.hide);
+  showSettings(); onSetting();
+});
+$('speed').addEventListener('change', onSetting);
+$('pad').addEventListener('pointerdown', e => { e.preventDefault(); if (S.state === 'run') tap(); else primary(); });
+
+addEventListener('keydown', e => {
+  if (e.code === 'Escape' && S.state === 'run') { abort(); return; }
+  if (e.code !== 'Space') return;
+  const el = document.activeElement;
+  if (S.state !== 'run' && el && /^(BUTTON|INPUT|SELECT)$/.test(el.tagName)) return;  // フォーカス中の操作を優先
+  e.preventDefault();
+  if (e.repeat) return;
+  if (S.state === 'run') tap(); else primary();
+});
+addEventListener('keyup', e => { if (e.code === 'Space' && S.state === 'run') e.preventDefault(); });
+
+function showSettings() {
+  $('speedV').textContent = (+$('speed').value).toFixed(1) + ' 秒';
+  const v = +$('offset').value;
+  $('offsetV').textContent = (v > 0 ? '+' : '') + v + ' ms';
+  $('cJudgeV').textContent = $('cJudge').value + '%';
+}
+for (const id of ['speed', 'offset']) {
+  $(id).addEventListener('input', () => { store.set('hs.' + id, +$(id).value); showSettings(); });
+  $(id).addEventListener('change', () => $(id).blur());
+}
+showSettings();
+renderDiffs(); renderStages();
+setMode(S.mode);
+addEventListener('resize', fit);
+fit();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
