@@ -26,7 +26,7 @@
 .center-hit:hover{border-color:#b0dcd0;background:#f9fffc}
 .center-hit.down,.center-hit:active{transform:scale(.945);background:#def7ed;border-color:var(--teal)}
 .center-phase{font-size:clamp(9px,1.8vw,12px);letter-spacing:.04em;font-weight:950;color:#8294a4;line-height:1.3;max-width:92%;overflow-wrap:anywhere}
-.center-judge{font-size:clamp(22px,4.0vw,35px);font-weight:1000;letter-spacing:-.06em;line-height:1.2;max-width:95%;overflow-wrap:anywhere}
+.center-judge{font-size:clamp(22px,4.0vw,35px);font-weight:1000;letter-spacing:-.06em;line-height:1.15;max-width:95%;overflow-wrap:anywhere}.judgement-timing{display:block;font-size:.5em;letter-spacing:.1em;line-height:1.35;font-weight:950}
 .center-hint{font-size:clamp(10px,1.8vw,13px);color:var(--orange);letter-spacing:.08em;font-weight:900}
 .focus-bottom{max-width:620px;margin:0 auto}
 .focus-tools{display:flex;justify-content:center;align-items:center;gap:12px;padding:2px 0 5px}
@@ -48,7 +48,7 @@
 .result-box{margin:12px auto 0;padding:18px;background:white;border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 28px #2b485515}
 .result-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.result-heading strong{font-size:19px}.score{font-size:30px;font-weight:1000;color:var(--teal)}.score.failed{color:var(--bad)}
 .result-detail,.result-comment{color:var(--muted);font-size:12px;line-height:1.9;margin:9px 0}
-.hit-history{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0}.hit-tick{width:11px;height:11px;background:#e0e6ed;border-radius:3px}.hit-tick.perfect{background:var(--teal)}.hit-tick.good{background:#7ecc8d}.hit-tick.off{background:var(--orange)}.hit-tick.miss{background:transparent;border:1px solid #9aa9b9}
+.hit-history{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0}.hit-tick{width:11px;height:11px;background:#e0e6ed;border-radius:3px}.hit-tick.perfect{background:var(--teal)}.hit-tick.great{background:#7ecc8d}.hit-tick.good{background:var(--orange)}.hit-tick.miss{background:transparent;border:1px solid #9aa9b9}
 .result-buttons{display:flex;gap:8px;flex-wrap:wrap}.result-buttons .btn{flex:1;min-width:118px;padding:10px;font-size:12px}
 .records-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}.record-card{background:white;border:1px solid var(--line);padding:20px;border-radius:16px}.record-card b{display:block;font-weight:900;font-size:13px}.record-card strong{display:block;font-size:26px;color:var(--teal);margin:8px 0}.record-card small{font-size:11px;color:var(--muted)}
 @media(max-width:900px){.app{padding:20px 17px 52px}.selection-layout{grid-template-columns:minmax(0,1fr) 275px;gap:12px}.play-grid{grid-template-columns:minmax(0,1fr) minmax(290px,.8fr);gap:12px}.board,.controls{padding:14px}.stage-card{padding:10px}.stage-card strong{font-size:14px}.home-stage{gap:14px}}
@@ -446,7 +446,7 @@ function startGame(){
  targets.push({t:end,status:'pending',delta:0,cycle:cfg.play,parts:cfg.you.layers.map((_,i)=>i),closing:true});
  for(let k=0;k<3;k++)queue.push({t:t0-.75+k*.25,side:'cue'});queue.sort((a,b)=>a.t-b.t);
  const W=Math.min(.17*cfg.j,minPhaseGap(cfg.you.events)*cfg.L*.43);
- S.run={bus,t0,end,L:cfg.L,total,queue,qi:0,targets,W,missed:0,extra:0,perfect:0,good:0,off:0,combo:0,bestCombo:0,delta:[],taps:[],sum:0,assist:S.assist,pattern:cfg};
+ S.run={bus,t0,end,L:cfg.L,total,queue,qi:0,targets,W,missed:0,extra:0,perfect:0,great:0,good:0,combo:0,bestCombo:0,delta:[],taps:[],sum:0,assist:S.assist,pattern:cfg};
  S.state='run';
  $('gameStart').innerHTML='<svg class="icon"><use href="#ic-stop"/></svg>';$('gameStart').title='中断';$('gameStart').setAttribute('aria-label','中断');
  $('statusTag').textContent='PLAYING';$('statusTag').classList.add('live');$('controlTitle').textContent='準備して…';
@@ -473,23 +473,23 @@ function hit(){
  beatSound(S.audio.currentTime,'you',0,out);setTimeout(()=>out.disconnect(),240);
  let best=null,bd=Infinity;
  for(const x of R.targets){if(x.status!=='pending')continue;const distance=Math.abs(now-x.t);if(distance<bd){best=x;bd=distance}}
- if(!best||bd>R.W){R.extra++;R.combo=0;R.taps.push({t:now,col:'#d75564'});feedback('EXTRA',varColor('--bad'));refreshStats();return}
+ if(!best||bd>R.W){R.extra++;R.combo=0;R.taps.push({t:now,col:'#d75564'});feedback('MISS',varColor('--bad'));refreshStats();return}
  const delta=now-best.t;best.delta=delta;R.delta.push(delta);R.taps.push({t:now,col:'#e77d42'});
- let label,color;
+ let label,color,direction='';
  if(bd<=.035*cfg.j){best.status='perfect';R.perfect++;R.sum+=100;label='PERFECT';color=varColor('--teal')}
- else if(bd<=.08*cfg.j){best.status='good';R.good++;R.sum+=75;label=delta<0?'少し早い':'少し遅い';color=varColor('--good')}
- else{best.status='off';R.off++;R.sum+=35;label=delta<0?'EARLY':'LATE';color=varColor('--orange')}
+ else if(bd<=.08*cfg.j){best.status='great';R.great++;R.sum+=75;label='GREAT';direction=delta<0?'FAST':'LATE';color=varColor('--good')}
+ else{best.status='good';R.good++;R.sum+=35;label='GOOD';direction=delta<0?'FAST':'LATE';color=varColor('--orange')}
  R.combo++;R.bestCombo=Math.max(R.combo,R.bestCombo);R.taps[R.taps.length-1].col=color;
- feedback(label,color);refreshStats();
+ feedback(label,color,direction);refreshStats();
 }
 function varColor(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
-function feedback(text,col){$('judgeText').textContent=text;$('judgeText').style.color=col||''}
-function refreshStats(){const R=S.run;if(!R)return;$('metricHits').textContent=(R.perfect+R.good+R.off)+'/'+R.targets.length;$('metricCombo').textContent=R.combo}
+function feedback(text,col,direction=''){const el=$('judgeText');el.textContent=text;el.style.color=col||'';if(direction){const sub=document.createElement('small');sub.className='judgement-timing';sub.textContent=direction;el.append(sub)}}
+function refreshStats(){const R=S.run;if(!R)return;$('metricHits').textContent=(R.perfect+R.great+R.good)+'/'+R.targets.length;$('metricCombo').textContent=R.combo}
 function frame(){if(S.state!=='run')return;const R=S.run,cfg=S.config;const now=calibratedNow();pump();for(const t of R.targets){if(t.status==='pending'&&now>t.t+R.W){t.status='miss';R.missed++;R.combo=0;feedback('MISS',varColor('--bad'))}}
  let prog=(now-R.t0)/cfg.L;let round=Math.floor(prog);let label='';if(prog<0){label='READY';$('controlTitle').textContent='スタートまで…'}else if(round<cfg.demo){label=`○ ${round+1}/${cfg.demo}`;$('controlTitle').textContent='○ の拍子を聴こう（まだ叩かない）';}else if(round<cfg.demo+cfg.play){label=`● ${round-cfg.demo+1}/${cfg.play}`;$('controlTitle').textContent='○ に合わせて ● を叩こう！';}else label='FINISH';$('phaseText').textContent=label;$('metricCycle').textContent=clamp(round-cfg.demo+1,0,cfg.play)+'/'+cfg.play;$('timebarFill').style.width=clamp((now-R.t0)/(R.end-R.t0)*100,0,100)+'%';refreshStats();drawPlay();if(now>R.end+R.W+.2){finishGame();return}S.paintFrame=requestAnimationFrame(frame)}
 function calcScore(R){return clamp(Math.round((R.sum-R.extra*14)/R.targets.length),0,100)}
 function finishGame(){const R=S.run,cfg=S.config;if(!R)return;S.state='done';stopSound();cancelAnimationFrame(S.paintFrame);const score=calcScore(R),clear=score>=cfg.clear;S.lastResult={score,clear,cfg};if(!S.assist){const key=recordKey(cfg);const old=S.records[key]||{best:0,clear:false,tries:0};S.records[key]={best:Math.max(old.best,score),clear:old.clear||clear,tries:old.tries+1};store.set('records',S.records);if(clear){if(MODES_STAGES[cfg.mode])S.progress[cfg.mode][cfg.level]=true; if(cfg.mode==='random')S.progress.random[cfg.level]=true;store.set('progress.v6',S.progress);refreshModeLocks();}if(cfg.mode==='ascent'&&clear&&S.ascent===cfg.level&&S.ascent<999){S.ascent++;store.set('ascent',S.ascent)}}$('statusTag').textContent=S.assist?'PRACTICE':'FINISHED';$('statusTag').classList.remove('live');$('gameStart').innerHTML='<svg class="icon"><use href="#ic-reset"/></svg>';$('gameStart').title='もう一度';$('gameStart').setAttribute('aria-label','もう一度');$('controlTitle').textContent=clear?'見事、クリア！':'リズムを振り返ろう';$('phaseText').textContent=clear?'CLEAR':'TRY AGAIN';feedback(score+'点',clear?varColor('--teal'):varColor('--orange'));
- $('resultBox').hidden=false;$('resultRank').textContent=clear?'CLEAR!':'TRY AGAIN';$('resultScore').textContent=score+'点';$('resultScore').className='score'+(clear?'':' failed');let avg=R.delta.length?Math.round(R.delta.reduce((a,b)=>a+b,0)/R.delta.length*1000):null;let bias=avg===null?'平均ズレ：計測なし':`平均ズレ：${Math.abs(avg)}ms ${avg<-5?'早め':avg>5?'遅め':'ほぼ0'}`;$('resultDetail').textContent=`PERFECT ${R.perfect} · GOOD ${R.good} · OFF ${R.off} · MISS ${R.missed} · 余計 ${R.extra} · 最大コンボ ${R.bestCombo} · ${bias}`;const hist=$('hitHistory');hist.replaceChildren();for(const t of R.targets){let el=document.createElement('span');el.className='hit-tick '+t.status;el.title=t.status==='miss'?'MISS':t.status.toUpperCase()+' '+Math.round(t.delta*1000)+'ms';hist.append(el)}let advise=R.missed?'● の打点を逃したところがあります。○ の音を基準にしつつ、内側の ● の印を意識してみよう。':R.extra?'余計な打点がありました。● の同じ瞬間に重なる拍は1回だけ叩けばOK。':avg!==null&&Math.abs(avg)>25?`全体的に${avg<0?'早く':'遅く'}打つ傾向があります。タイミングを少し調整してみよう。`:'いい感じ！次はコンボとタイミングの精度を上げよう。';if(S.assist)advise='練習モードのため、記録は更新されません。 '+advise;$('resultAdvice').textContent=advise;$('resultNext').hidden=!(clear&&!S.assist&&((cfg.mode==='ascent'&&S.ascent!==cfg.level)||(MODES_STAGES[cfg.mode]&&cfg.level<MODES_STAGES[cfg.mode].length-1)||(cfg.mode==='random')));if(cfg.mode==='random'){$('resultNext').hidden=!(clear&&!S.assist);$('resultNext').textContent=cfg.level<RANDOM.length-1?'次の難易度へ →':'別の問題へ →'}else $('resultNext').textContent='次の課題へ →';drawPlay();$('resultBox').scrollIntoView({behavior:'smooth',block:'nearest'})}
+ $('resultBox').hidden=false;$('resultRank').textContent=clear?'CLEAR!':'TRY AGAIN';$('resultScore').textContent=score+'点';$('resultScore').className='score'+(clear?'':' failed');let avg=R.delta.length?Math.round(R.delta.reduce((a,b)=>a+b,0)/R.delta.length*1000):null;let bias=avg===null?'平均ズレ：計測なし':`平均ズレ：${Math.abs(avg)}ms ${avg<-5?'早め':avg>5?'遅め':'ほぼ0'}`;$('resultDetail').textContent=`PERFECT ${R.perfect} · GREAT ${R.great} · GOOD ${R.good} · MISS ${R.missed+R.extra} · 最大コンボ ${R.bestCombo} · ${bias}`;const hist=$('hitHistory');hist.replaceChildren();for(const t of R.targets){let el=document.createElement('span');el.className='hit-tick '+t.status;el.title=t.status==='miss'?'MISS':t.status.toUpperCase()+(t.status==='perfect'?'':t.delta<0?' FAST':' LATE')+' '+Math.round(t.delta*1000)+'ms';hist.append(el)}let advise=R.missed?'● の打点を逃したところがあります。○ の音を基準にしつつ、内側の ● の印を意識してみよう。':R.extra?'余計な打点がありました。● の同じ瞬間に重なる拍は1回だけ叩けばOK。':avg!==null&&Math.abs(avg)>25?`全体的に${avg<0?'早く':'遅く'}打つ傾向があります。タイミングを少し調整してみよう。`:'いい感じ！次はコンボとタイミングの精度を上げよう。';if(S.assist)advise='練習モードのため、記録は更新されません。 '+advise;$('resultAdvice').textContent=advise;$('resultNext').hidden=!(clear&&!S.assist&&((cfg.mode==='ascent'&&S.ascent!==cfg.level)||(MODES_STAGES[cfg.mode]&&cfg.level<MODES_STAGES[cfg.mode].length-1)||(cfg.mode==='random')));if(cfg.mode==='random'){$('resultNext').hidden=!(clear&&!S.assist);$('resultNext').textContent=cfg.level<RANDOM.length-1?'次の難易度へ →':'別の問題へ →'}else $('resultNext').textContent='次の課題へ →';drawPlay();$('resultBox').scrollIntoView({behavior:'smooth',block:'nearest'})}
 function playNext(){
  const cfg=S.config;
  if(!S.lastResult?.clear||S.assist)return;
